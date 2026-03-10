@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/753/753361.png">
+    <title>LFNR Mobile Nav</title>
+    <style>
+        :root { --primary: #3498db; --success: #27ae60; --bg: #121212; --card: #1e1e1e; }
+        body { font-family: sans-serif; background: var(--bg); color: #e0e0e0; margin: 0; padding: 10px; display: flex; justify-content: center; }
+        .panel { background: var(--card); padding: 15px; border-radius: 12px; width: 100%; max-width: 450px; border: 1px solid #333; box-sizing: border-box; }
+        h2 { color: var(--primary); text-align: center; font-size: 1.1em; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .group { margin-bottom: 12px; }
+        label { display: block; font-size: 0.7em; color: #888; margin-bottom: 4px; font-weight: bold; }
+        select, input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #444; background: #252525; color: #fff; font-size: 16px; box-sizing: border-box; }
+        button { width: 100%; padding: 16px; background: var(--success); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin-top: 5px; cursor: pointer; }
+        .p-coords-box { background: #1a2a3a; padding: 12px; border-radius: 8px; margin-top: 15px; border-left: 4px solid var(--primary); }
+        .dms-val { font-family: monospace; font-size: 1em; color: #f1c40f; font-weight: bold; }
+        .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .res-box { background: #000; padding: 12px; border-radius: 8px; border-top: 3px solid var(--primary); }
+        .res-title { font-size: 0.7em; color: #888; margin-bottom: 8px; text-align: center; }
+        .data-row { display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 5px; }
+        .val { color: #fff; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="panel">
+    <h2>LFNR - BERRE LA FARE</h2>
+    <div class="group"><label>AXE (QFU)</label><select id="axis"><option value="158">AXE 16 / 34 (158°)</option><option value="083">AXE 08 / 26 (083°)</option></select></div>
+    <div class="group"><label>RÉFÉRENCE SEUIL (A)</label><input type="text" id="posA" value="43.536667, 5.177500"></div>
+    <div class="group"><label>MA POSITION (P)</label><input type="text" id="posP" placeholder="Coller Lat, Lon"></div>
+    <button onclick="calculate()">CALCULER</button>
+    <div id="p-dms" class="p-coords-box" style="display:none;"><label>POSITION P (H/M/S)</label><div id="latDMS" class="dms-val"></div><div id="lonDMS" class="dms-val"></div></div>
+    <div class="results-grid">
+        <div class="res-box" style="border-top-color:#f1c40f;"><div class="res-title">MAGNÉTIQUE (2°E)</div><div class="data-row">Az: <span id="azMag" class="val">--</span></div><div class="data-row">Xtk: <span id="xtkMag" class="val">--</span></div><div class="data-row">Dist: <span id="distMag" class="val">--</span></div></div>
+        <div class="res-box"><div class="res-title">GÉOGRAPHIQUE</div><div class="data-row">Az: <span id="azGeo" class="val">--</span></div><div class="data-row">Xtk: <span id="xtkGeo" class="val">--</span></div><div class="data-row">Dist: <span id="distGeo" class="val">--</span></div></div>
+    </div>
+</div>
+<script>
+function toDMS(deg, isLat) {
+    const abs = Math.abs(deg);
+    const d = Math.floor(abs), m = Math.floor((abs-d)*60), s = ((abs-d-m/60)*3600).toFixed(1);
+    return `${d}°${m}'${s}"${isLat?(deg>=0?"N":"S"):(deg>=0?"E":"W")}`;
+}
+function calculate() {
+    const a = document.getElementById('posA').value.split(/[\s,]+/), p = document.getElementById('posP').value.split(/[\s,]+/);
+    const latA = parseFloat(a[0]), lonA = parseFloat(a[1]), latP = parseFloat(p[0]), lonP = parseFloat(p[1]), qfu = parseFloat(document.getElementById('axis').value), dec = 2;
+    if (isNaN(latP)) return;
+    document.getElementById('p-dms').style.display = 'block';
+    document.getElementById('latDMS').innerText = toDMS(latP, true);
+    document.getElementById('lonDMS').innerText = toDMS(lonP, false);
+    const R = 6371000, toRad = Math.PI/180;
+    const dY = (latP-latA)*toRad*R, dX = (lonP-lonA)*toRad*R*Math.cos(latA*toRad);
+    let azG = Math.atan2(dX, dY)*(180/Math.PI); if(azG<0) azG+=360;
+    let azM = (azG-dec+360)%360;
+    const xtkG = Math.abs(dX*Math.cos((qfu+dec)*toRad)-dY*Math.sin((qfu+dec)*toRad));
+    const xtkM = Math.abs(dX*Math.cos(qfu*toRad)-dY*Math.sin(qfu*toRad));
+    const dist = Math.sqrt(dX*dX+dY*dY);
+    document.getElementById('azMag').innerText = azM.toFixed(1)+"°";
+    document.getElementById('xtkMag').innerText = Math.round(xtkM)+"m";
+    document.getElementById('distMag').innerText = Math.round(dist)+"m";
+    document.getElementById('azGeo').innerText = azG.toFixed(1)+"°";
+    document.getElementById('xtkGeo').innerText = Math.round(xtkG)+"m";
+    document.getElementById('distGeo').innerText = Math.round(dist)+"m";
+}
+</script>
+</body>
+</html>
